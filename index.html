@@ -1,0 +1,3471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Atlas of Echoes</title>
+
+<!-- PWA / installability -->
+<meta name="theme-color" content="#050403">
+<meta name="description" content="A living chart of worlds in motion — a cartographic companion for tracking players, creatures, and locations in real time.">
+<link rel="manifest" href="/site.webmanifest">
+
+<!-- Favicons -->
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+<!-- iOS home-screen / standalone app behavior -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atlas of Echoes">
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap');
+
+/* ============================================================
+   CSS CUSTOM PROPERTIES — Design Token System
+   ============================================================ */
+:root {
+  /* Palette — cursed atlas: charcoal, cold stone, aged iron, desaturated browns.
+     Bright gold is retired from general use; --legendary-gold exists ONLY for
+     truly rare/legendary accents and must not be used for ordinary chrome. */
+  --ink-void:       #050403;
+  --parchment-deep: #14100b;
+  --parchment-mid:  #201a12;
+  --parchment-warm: #2c2419;
+  --vellum-dark:    #4a4436;
+  --vellum-mid:     #6d6350;
+  --vellum-light:   #948767;
+  --vellum-pale:    #bcae8c;
+  --ghost-gold:     #cbb98a;   /* muted, worn parchment-ink — NOT bright gold */
+  --ink-gold:       #8a7048;   /* aged bronze — replaces prior bright gold accent */
+  --ink-amber:      #6e5a38;   /* dull antique brass */
+  --legendary-gold: #d4a84b;   /* reserved: legendary items / rare relics ONLY */
+  --verdigris-dark: #14231c;
+  --verdigris-mid:  #223a2c;
+  --verdigris:      #35543e;
+  --verdigris-pale: #567a60;
+  --crimson-dark:   #2a0808;
+  --crimson-mid:    #4a1010;
+  --crimson:        #6e1c1c;
+  --crimson-pale:   #a83a3a;
+  --sapphire-dark:  #0a141f;
+  --sapphire:       #16283c;
+  --sapphire-pale:  #3f6a90;
+  --ash:            #6b6152;
+  --ash-pale:       #948a76;
+
+  /* Stone / iron / bronze materials */
+  --stone-dark:     #201f1d;
+  --stone-mid:      #37342f;
+  --stone-light:    #55504a;
+  --iron-dark:      #232323;
+  --iron-mid:       #3c3c3c;
+  --iron-light:     #5c5c5c;
+  --brass-dark:     #4a3a20;
+  --brass-mid:      #7a6136;
+  --brass-light:    #a5875a;
+  --blood:          #5c1414;
+
+  /* Entity Colors */
+  /* CHANGED: Location markers are now carved stone rune-monuments — muted
+     bronze/stone, not emerald and not gold, so they read as ancient artifacts. */
+  --col-location:        #9a8259;   /* weathered bronze-stone */
+  --col-location-border: #6e5a38;   /* darker antique brass border */
+  --col-location-glow:   rgba(154,130,89,.35); /* soft glow for hover/focus */
+  --col-player:   #4a7fac;
+  --col-npc:      #8a7048;
+  --col-enemy:    var(--crimson-pale);
+
+  /* Spacing */
+  --sp-xs:  4px;
+  --sp-sm:  8px;
+  --sp-md:  16px;
+  --sp-lg:  24px;
+  --sp-xl:  40px;
+
+  /* Typography — ancient manuscript / engraved-stone hierarchy */
+  --font-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+  --font-body:    'EB Garamond', 'Palatino Linotype', Palatino, 'Book Antiqua', serif;
+  --font-mono:    'Courier New', Courier, monospace;
+  --font-ui:      system-ui, -apple-system, sans-serif;
+
+  /* Shadows */
+  --shadow-parchment: 0 2px 24px rgba(0,0,0,0.9), inset 0 1px 0 rgba(154,130,89,0.08);
+  --shadow-glow-gold: 0 0 18px rgba(138,112,72,0.35);
+  --shadow-glow-blue: 0 0 20px rgba(74,122,172,0.5);
+  --shadow-inset:     inset 0 2px 10px rgba(0,0,0,0.7);
+  --shadow-legendary: 0 0 22px rgba(212,168,75,0.55);
+
+  /* Timing */
+  --t-fast:   120ms;
+  --t-mid:    300ms;
+  --t-slow:   600ms;
+  --t-crawl:  1200ms;
+
+  /* Grid */
+  --grid-size: 17;
+  --cell-size: 50px;
+  --cell-gap:  2px;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--ink-void);
+  color: var(--vellum-pale);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(138,112,72,0.35); color: var(--ghost-gold); }
+
+/* ============================================================
+   WORLD ATMOSPHERE — global cinematic layer, sits above every
+   screen. Pure CSS, transform/opacity only animations so it stays
+   GPU-cheap and never touches layout.
+   ============================================================ */
+.world-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Permanent vignette — darkens every edge of the screen, always-on dread */
+.atmo-vignette {
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(ellipse 70% 65% at 50% 45%, transparent 45%, rgba(2,2,1,0.55) 85%, rgba(2,2,1,0.85) 100%);
+}
+
+/* Film grain — SVG turbulence data-uri, flickered via opacity only (cheap) */
+.atmo-grain {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  animation: grainFlicker 400ms steps(2) infinite;
+  mix-blend-mode: overlay;
+}
+@keyframes grainFlicker {
+  0%   { transform: translate(0,0); }
+  50%  { transform: translate(-1%,1%); }
+  100% { transform: translate(1%,-1%); }
+}
+
+/* Drifting fog banks — two soft, slow, oversized gradients */
+.atmo-fog {
+  position: absolute;
+  inset: 0;
+}
+.atmo-fog::before,
+.atmo-fog::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 160%;
+  height: 100%;
+  opacity: 0.5;
+  will-change: transform;
+}
+.atmo-fog::before {
+  left: -60%;
+  background: radial-gradient(ellipse 40% 60% at 30% 70%, rgba(90,86,74,0.10) 0%, transparent 65%),
+              radial-gradient(ellipse 30% 40% at 70% 30%, rgba(60,58,50,0.08) 0%, transparent 60%);
+  animation: fogDriftA 70s linear infinite;
+}
+.atmo-fog::after {
+  left: -30%;
+  background: radial-gradient(ellipse 35% 50% at 60% 60%, rgba(50,48,42,0.09) 0%, transparent 60%);
+  animation: fogDriftB 95s linear infinite reverse;
+}
+@keyframes fogDriftA { from { transform: translateX(0); } to { transform: translateX(35%); } }
+@keyframes fogDriftB { from { transform: translateX(0); } to { transform: translateX(-25%); } }
+
+/* Floating dust motes — tiny embers of light drifting upward */
+.atmo-dust {
+  position: absolute;
+  inset: 0;
+}
+.atmo-dust span {
+  position: absolute;
+  bottom: -5%;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: rgba(203,185,138,0.5);
+  box-shadow: 0 0 3px rgba(203,185,138,0.4);
+  animation: dustRise linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes dustRise {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  10%  { opacity: 0.7; }
+  90%  { opacity: 0.3; }
+  100% { transform: translateY(-110vh) translateX(20px); opacity: 0; }
+}
+
+/* Drifting ash — warmer, slower, larger than dust */
+.atmo-ash span {
+  position: absolute;
+  bottom: -5%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(160,90,50,0.35);
+  box-shadow: 0 0 4px rgba(160,90,50,0.3);
+  animation: ashRise linear infinite;
+  will-change: transform, opacity;
+}
+@keyframes ashRise {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
+  15%  { opacity: 0.5; }
+  85%  { opacity: 0.15; }
+  100% { transform: translateY(-105vh) translateX(-30px) rotate(90deg); opacity: 0; }
+}
+
+/* ============================================================
+   SCREENS — Layered stack
+   ============================================================ */
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--t-slow) ease, transform var(--t-slow) ease;
+  will-change: opacity, transform;
+}
+.screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.98);
+}
+.screen.visible {
+  opacity: 1;
+  pointer-events: all;
+  transform: scale(1);
+}
+
+/* ============================================================
+   LANDING SCREEN
+   ============================================================ */
+#screen-landing {
+  background: var(--ink-void);
+  flex-direction: column;
+  z-index: 10;
+}
+
+/* Animated starfield background */
+.landing-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Parchment texture overlay */
+.landing-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 120% 60% at 50% 100%, rgba(26,18,8,0) 0%, rgba(8,6,3,0.9) 70%),
+    radial-gradient(ellipse 60% 80% at 50% -10%, rgba(40,28,10,0.8) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 50% at 0% 50%, rgba(10,15,30,0.5) 0%, transparent 50%),
+    radial-gradient(ellipse 100% 50% at 100% 50%, rgba(30,10,10,0.4) 0%, transparent 50%);
+  z-index: 1;
+}
+
+/* Compass rose lines */
+.compass-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.05;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(154,130,89,0.7) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(154,130,89,0.7) 60px);
+  animation: compassShift 30s linear infinite;
+}
+@keyframes compassShift {
+  from { transform: translate(0,0); }
+  to   { transform: translate(60px, 60px); }
+}
+
+/* Rune glyphs floating */
+.rune-field {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.rune {
+  position: absolute;
+  font-family: var(--font-display);
+  color: rgba(154,130,89,0.09);
+  font-size: 28px;
+  animation: runeDrift linear infinite;
+  user-select: none;
+  letter-spacing: 0.2em;
+}
+@keyframes runeDrift {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
+}
+
+/* Stars */
+.star-field {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  animation: starTwinkle ease-in-out infinite alternate;
+}
+@keyframes starTwinkle {
+  from { opacity: 0.1; transform: scale(0.8); }
+  to   { opacity: 0.9; transform: scale(1.2); }
+}
+
+/* Central glow orb */
+.landing-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;
+  height: 400px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse, rgba(138,112,72,0.06) 0%, transparent 70%);
+  z-index: 2;
+  animation: glowPulse 4s ease-in-out infinite alternate;
+}
+@keyframes glowPulse {
+  from { opacity: 0.5; transform: translate(-50%,-50%) scale(0.95); }
+  to   { opacity: 1;   transform: translate(-50%,-50%) scale(1.05); }
+}
+
+/* Landing content */
+.landing-content {
+  position: relative;
+  z-index: 5;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-lg);
+  animation: landingReveal 1.2s ease forwards;
+  opacity: 0;
+}
+@keyframes landingReveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Logo mark — the sigil above the title */
+.logo-sigil {
+  width: 80px;
+  height: 80px;
+  position: relative;
+  margin: 0 auto var(--sp-sm);
+}
+.logo-sigil::before,
+.logo-sigil::after {
+  content: '';
+  position: absolute;
+  border: 1px solid rgba(138,112,72,0.6);
+  border-radius: 50%;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  animation: sigilSpin linear infinite;
+}
+.logo-sigil::before {
+  width: 80px; height: 80px;
+  animation-duration: 20s;
+  border-style: dashed;
+}
+.logo-sigil::after {
+  width: 54px; height: 54px;
+  animation-duration: 14s;
+  animation-direction: reverse;
+}
+.sigil-center {
+  /* This relic is the single legendary-gold accent on the whole screen —
+     a last ember of old magic at the heart of a dead atlas. */
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 28px; height: 28px;
+  border: 1px solid var(--legendary-gold);
+  transform: translate(-50%,-50%) rotate(45deg);
+  animation: sigilBreathe 4.5s ease-in-out infinite;
+  box-shadow: 0 0 12px rgba(212,168,75,0.45), inset 0 0 8px rgba(212,168,75,0.18);
+}
+@keyframes sigilSpin {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+@keyframes sigilBreathe {
+  0%, 100% { box-shadow: 0 0 8px rgba(212,168,75,0.25), inset 0 0 6px rgba(212,168,75,0.1); }
+  50%      { box-shadow: 0 0 22px rgba(212,168,75,0.7), 0 0 42px rgba(212,168,75,0.18), inset 0 0 10px rgba(212,168,75,0.25); }
+}
+
+/* Logo text */
+.logo-eyebrow {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--vellum-mid);
+  opacity: 0.85;
+  margin-bottom: var(--sp-xs);
+}
+.logo-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(42px, 7vw, 80px);
+  letter-spacing: 0.09em;
+  line-height: 1;
+  color: var(--ghost-gold);
+  text-shadow:
+    0 0 40px rgba(20,16,11,0.9),
+    0 1px 0 rgba(0,0,0,0.9),
+    0 2px 5px rgba(0,0,0,0.85),
+    0 0 24px rgba(212,168,75,0.12);
+  position: relative;
+}
+.logo-title::after {
+  content: '';
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ink-gold), transparent);
+  margin-top: var(--sp-sm);
+  opacity: 0.5;
+}
+.logo-subtitle {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-style: italic;
+  color: var(--ash-pale);
+  letter-spacing: 0.05em;
+  max-width: 380px;
+  opacity: 0.8;
+  line-height: 1.6;
+}
+
+/* Input group */
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-md);
+  margin-top: var(--sp-md);
+}
+.input-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--vellum-light);
+  opacity: 0.7;
+}
+.room-input-wrap {
+  position: relative;
+}
+.room-input-wrap::before,
+.room-input-wrap::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 20px;
+  height: 1px;
+  background: rgba(138,112,72,0.5);
+}
+.room-input-wrap::before { right: 100%; margin-right: var(--sp-sm); }
+.room-input-wrap::after  { left:  100%; margin-left:  var(--sp-sm); }
+
+#room-id-input {
+  background: rgba(26,18,8,0.9);
+  border: 1px solid rgba(148,135,103,0.35);
+  border-radius: 3px;
+  color: var(--ghost-gold);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  padding: 12px 24px;
+  text-align: center;
+  width: 280px;
+  outline: none;
+  transition: border-color var(--t-mid), box-shadow var(--t-mid);
+  box-shadow: var(--shadow-inset), 0 0 0 0 rgba(138,112,72,0);
+}
+#room-id-input::placeholder { color: rgba(148,135,103,0.3); letter-spacing: 0.1em; }
+#room-id-input:focus {
+  border-color: rgba(138,112,72,0.7);
+  box-shadow: var(--shadow-inset), 0 0 20px rgba(138,112,72,0.15);
+}
+
+.enter-btn {
+  position: relative;
+  /* Forged brass plate over dark iron — subtle diagonal hammer-strike texture */
+  background:
+    repeating-linear-gradient(135deg, rgba(255,255,255,0.02) 0px, transparent 2px, transparent 5px),
+    linear-gradient(180deg, var(--brass-mid) 0%, var(--iron-dark) 100%);
+  border: 1px solid var(--brass-dark);
+  border-radius: 2px;
+  color: var(--ghost-gold);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  padding: 14px 40px;
+  transition: all var(--t-mid);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -2px 4px rgba(0,0,0,0.5);
+}
+.enter-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(203,185,138,0.12), transparent);
+  transition: left var(--t-slow);
+}
+.enter-btn:hover {
+  border-color: var(--brass-light);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.7), 0 0 22px rgba(122,97,54,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+  color: var(--ghost-gold);
+}
+.enter-btn:hover::before { left: 100%; }
+.enter-btn:active { transform: translateY(1px); box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); }
+
+.landing-footer {
+  position: absolute;
+  bottom: var(--sp-lg);
+  left: 0; right: 0;
+  text-align: center;
+  z-index: 5;
+}
+.landing-footer p {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(148,135,103,0.3);
+  letter-spacing: 0.08em;
+}
+
+/* ============================================================
+   LOADING SCREEN
+   ============================================================ */
+#screen-loading {
+  background: var(--ink-void);
+  flex-direction: column;
+  gap: var(--sp-lg);
+  z-index: 9;
+}
+
+.loading-compass {
+  position: relative;
+  width: 140px;
+  height: 140px;
+}
+.compass-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(138,112,72,0.3);
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+}
+.compass-ring:nth-child(1) {
+  width: 140px; height: 140px;
+  border-color: rgba(138,112,72,0.5);
+  animation: compassRing1 8s linear infinite;
+  border-style: dashed;
+}
+.compass-ring:nth-child(2) {
+  width: 110px; height: 110px;
+  animation: compassRing2 6s linear infinite reverse;
+  border-color: rgba(138,112,72,0.3);
+}
+.compass-ring:nth-child(3) {
+  width: 78px; height: 78px;
+  animation: compassRing1 10s linear infinite;
+  border-color: rgba(74,122,172,0.4);
+  border-style: dotted;
+}
+@keyframes compassRing1 {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+@keyframes compassRing2 {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(-360deg); }
+}
+
+.compass-needle {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 2px;
+  transform-origin: bottom center;
+  animation: compassNeedle 3s ease-in-out infinite alternate;
+}
+.compass-needle.n {
+  height: 50px;
+  margin-left: -1px;
+  margin-top: -50px;
+  background: linear-gradient(180deg, var(--crimson-pale), rgba(139,32,32,0.3));
+}
+.compass-needle.s {
+  height: 35px;
+  margin-left: -1px;
+  background: linear-gradient(0deg, var(--vellum-light), rgba(148,135,103,0.3));
+  transform-origin: top center;
+}
+@keyframes compassNeedle {
+  from { transform: rotate(-8deg); }
+  to   { transform: rotate(8deg); }
+}
+.compass-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 12px; height: 12px;
+  background: var(--ink-gold);
+  border-radius: 50%;
+  transform: translate(-50%,-50%);
+  box-shadow: 0 0 10px rgba(138,112,72,0.8);
+}
+
+/* Cardinal marks */
+.compass-cardinal {
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: rgba(148,135,103,0.7);
+  letter-spacing: 0.05em;
+}
+.compass-cardinal.n-label { top: 2px; left: 50%; transform: translateX(-50%); }
+.compass-cardinal.s-label { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.compass-cardinal.e-label { right: 2px; top: 50%; transform: translateY(-50%); }
+.compass-cardinal.w-label { left: 2px; top: 50%; transform: translateY(-50%); }
+
+/* Constellation particles */
+.constellation-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.loading-text {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.3em;
+  color: var(--vellum-light);
+  font-style: italic;
+  animation: loadingTextPulse 2s ease-in-out infinite alternate;
+}
+@keyframes loadingTextPulse {
+  from { opacity: 0.5; }
+  to   { opacity: 1; }
+}
+.loading-dots::after {
+  content: '';
+  animation: loadingDots 1.5s steps(4, end) infinite;
+}
+@keyframes loadingDots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
+}
+
+/* ============================================================
+   ERROR SCREEN
+   ============================================================ */
+#screen-error {
+  background: var(--ink-void);
+  flex-direction: column;
+  gap: var(--sp-lg);
+  z-index: 9;
+  text-align: center;
+}
+
+/* CSS illustration — broken compass / torn map */
+.error-illustration {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
+}
+.err-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+}
+.err-ring-1 {
+  width: 160px; height: 160px;
+  border-color: rgba(139,32,32,0.5);
+  border-style: dashed;
+  animation: errSpin 20s linear infinite;
+}
+.err-ring-2 {
+  width: 120px; height: 120px;
+  border-color: rgba(139,32,32,0.3);
+  animation: errSpin 14s linear infinite reverse;
+}
+.err-crack {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 2px;
+  height: 60px;
+  background: linear-gradient(180deg, var(--crimson), transparent);
+  transform-origin: top center;
+}
+.err-crack:nth-child(3) { transform: rotate(30deg);  margin-left: -1px; margin-top: 0; }
+.err-crack:nth-child(4) { transform: rotate(100deg); margin-left: -1px; margin-top: 0; }
+.err-crack:nth-child(5) { transform: rotate(200deg); margin-left: -1px; margin-top: 0; }
+.err-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 20px; height: 20px;
+  background: var(--crimson);
+  transform: translate(-50%,-50%) rotate(45deg);
+  box-shadow: 0 0 20px rgba(139,32,32,0.6);
+}
+@keyframes errSpin {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+
+.error-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  color: var(--crimson-pale);
+  letter-spacing: 0.1em;
+}
+.error-message {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ash-pale);
+  font-style: italic;
+  max-width: 340px;
+  opacity: 0.8;
+}
+.error-room-wrap {
+  display: flex;
+  gap: var(--sp-sm);
+  align-items: center;
+}
+#error-room-id {
+  background: rgba(26,18,8,0.9);
+  border: 1px solid rgba(139,32,32,0.4);
+  border-radius: 3px;
+  color: var(--ghost-gold);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  letter-spacing: 0.15em;
+  padding: 10px 18px;
+  outline: none;
+  transition: border-color var(--t-mid);
+  width: 220px;
+  text-align: center;
+}
+#error-room-id:focus { border-color: rgba(138,112,72,0.6); }
+
+.retry-btn {
+  background: linear-gradient(180deg, var(--blood) 0%, var(--crimson-dark) 100%);
+  border: 1px solid rgba(110,28,28,0.7);
+  border-radius: 2px;
+  color: var(--vellum-pale);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  padding: 10px 24px;
+  transition: all var(--t-mid);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 3px 10px rgba(0,0,0,0.5);
+}
+.retry-btn:hover {
+  border-color: var(--crimson-pale);
+  box-shadow: 0 0 20px rgba(139,32,32,0.3);
+  color: var(--ghost-gold);
+}
+
+/* ============================================================
+   MAIN APP SCREEN
+   ============================================================ */
+#screen-app {
+  background: var(--parchment-deep);
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  z-index: 8;
+  overflow: hidden;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.app-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--sp-lg);
+  height: 56px;
+  background:
+    linear-gradient(180deg, rgba(44,36,25,0.5) 0%, transparent 100%),
+    var(--ink-void);
+  border-bottom: 1px solid rgba(154,130,89,0.22);
+  flex-shrink: 0;
+  z-index: 100;
+}
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(122,97,54,0.55) 30%, rgba(122,97,54,0.55) 70%, transparent);
+  animation: torchFlicker 6s ease-in-out infinite;
+}
+@keyframes torchFlicker {
+  0%, 100% { opacity: 1; }
+  8%       { opacity: 0.75; }
+  14%      { opacity: 0.95; }
+  40%      { opacity: 0.85; }
+  62%      { opacity: 1; }
+  78%      { opacity: 0.8; }
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-lg);
+}
+.header-logo {
+  position: relative;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--ghost-gold);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* Small engraved compass rune spinning slowly behind the diamond mark */
+.header-logo::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 20px; height: 20px;
+  margin-left: -2px;
+  transform: translate(-50%,-50%);
+  border: 1px dashed rgba(122,97,54,0.35);
+  border-radius: 50%;
+  animation: compassShift2 18s linear infinite;
+  pointer-events: none;
+}
+@keyframes compassShift2 {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+.header-logo span {
+  position: relative;
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--ink-gold);
+  transform: rotate(45deg);
+  margin: 0 8px;
+  vertical-align: middle;
+  box-shadow: 0 0 5px rgba(122,97,54,0.5);
+}
+
+.world-title {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--vellum-light);
+  border-left: 1px solid rgba(154,130,89,0.3);
+  padding-left: var(--sp-md);
+  opacity: 0.9;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--ash-pale);
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--verdigris-pale);
+  box-shadow: 0 0 6px var(--verdigris-pale);
+  animation: statusPulse 2s ease-in-out infinite alternate;
+}
+.status-dot.offline { background: var(--crimson); box-shadow: 0 0 6px var(--crimson); }
+.status-dot.loading { background: var(--ink-gold); box-shadow: 0 0 6px var(--ink-gold); animation: none; }
+@keyframes statusPulse {
+  from { opacity: 0.6; }
+  to   { opacity: 1; }
+}
+
+.room-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--vellum-light);
+  background: rgba(148,135,103,0.08);
+  border: 1px solid rgba(148,135,103,0.2);
+  border-radius: 2px;
+  padding: 3px 10px;
+  letter-spacing: 0.1em;
+}
+
+.timestamp {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--ash);
+  letter-spacing: 0.03em;
+}
+
+.icon-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(148,135,103,0.2);
+  border-radius: 3px;
+  color: var(--ash-pale);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all var(--t-fast);
+  font-family: var(--font-ui);
+}
+.icon-btn:hover {
+  border-color: rgba(148,135,103,0.5);
+  color: var(--vellum-pale);
+  background: rgba(148,135,103,0.06);
+}
+.icon-btn.active {
+  border-color: var(--ink-gold);
+  color: var(--ink-gold);
+  background: rgba(138,112,72,0.1);
+}
+
+/* ============================================================
+   TOOLBAR
+   ============================================================ */
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: 0 var(--sp-lg);
+  height: 44px;
+  background: rgba(0,0,0,0.4);
+  border-bottom: 1px solid rgba(148,135,103,0.12);
+  flex-shrink: 0;
+  z-index: 99;
+}
+
+/* Search */
+/* CHANGED: .search-wrap no longer has flex:1 / max-width — the input itself
+   handles all sizing so the wrap is just a positioning anchor. */
+.search-wrap {
+  position: relative;
+  /* flex:1 removed — width is driven by the input's own transition */
+}
+.search-icon {
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--ash);
+  font-size: 12px;
+  pointer-events: none;
+  /* ADDED: icon fades gently when the input expands / focuses */
+  transition: color var(--t-mid);
+}
+/* ADDED: when the input is expanded (class toggled by JS), brighten the icon */
+.search-wrap.expanded .search-icon {
+  color: var(--vellum-light);
+}
+
+/* CHANGED: Fixed compact default width; expands on focus or when text is present.
+   The .expanded class is toggled by JS (see initSearch below).
+   Width transitions smoothly over 300ms for a polished feel without layout shifts
+   because the toolbar uses flex and the search-wrap has no flex-grow. */
+#search-input {
+  width: 140px;                        /* compact default */
+  background: rgba(26,18,8,0.7);
+  border: 1px solid rgba(148,135,103,0.2);
+  border-radius: 3px;
+  color: var(--vellum-pale);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 5px 10px 5px 28px;
+  outline: none;
+  /* CHANGED: width is now animated alongside the existing border/shadow transitions */
+  transition: width 300ms cubic-bezier(0.4,0,0.2,1),
+              border-color var(--t-mid),
+              box-shadow var(--t-mid);
+}
+#search-input::placeholder { color: var(--ash); font-style: italic; }
+
+/* ADDED: expanded state — applied when focused OR when input has text (see JS) */
+#search-input:focus,
+.search-wrap.expanded #search-input {
+  width: 280px;                        /* expanded width */
+  border-color: rgba(138,112,72,0.55);
+  box-shadow: 0 0 14px rgba(138,112,72,0.13);
+}
+
+/* Coordinate jump */
+.coord-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  border-left: 1px solid rgba(148,135,103,0.15);
+  padding-left: var(--sp-md);
+}
+.coord-wrap label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ash);
+  text-transform: uppercase;
+}
+.coord-input {
+  width: 44px;
+  background: rgba(26,18,8,0.7);
+  border: 1px solid rgba(148,135,103,0.2);
+  border-radius: 3px;
+  color: var(--vellum-pale);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 6px;
+  text-align: center;
+  outline: none;
+  transition: border-color var(--t-mid);
+}
+.coord-input:focus { border-color: rgba(138,112,72,0.5); }
+
+.goto-btn {
+  background: rgba(138,112,72,0.1);
+  border: 1px solid rgba(138,112,72,0.3);
+  border-radius: 3px;
+  color: var(--vellum-light);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 4px 10px;
+  transition: all var(--t-fast);
+}
+.goto-btn:hover { background: rgba(138,112,72,0.2); color: var(--ghost-gold); }
+
+/* Filters */
+.filter-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(148,135,103,0.15);
+  flex-shrink: 0;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid rgba(148,135,103,0.2);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  transition: all var(--t-fast);
+  white-space: nowrap;
+}
+.filter-btn .filter-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.filter-btn[data-type="player"]   { color: var(--col-player);   border-color: rgba(90,159,212,0.3); }
+.filter-btn[data-type="npc"]      { color: var(--col-npc);      border-color: rgba(200,160,64,0.3); }
+.filter-btn[data-type="enemy"]    { color: var(--col-enemy);    border-color: rgba(201,64,64,0.3); }
+/* Location filter uses the weathered bronze-stone rune-monument color */
+.filter-btn[data-type="location"] { color: var(--col-location); border-color: rgba(154,130,89,0.35); }
+.filter-btn[data-type="player"]   .filter-dot { background: var(--col-player); }
+.filter-btn[data-type="npc"]      .filter-dot { background: var(--col-npc); }
+.filter-btn[data-type="enemy"]    .filter-dot { background: var(--col-enemy); }
+.filter-btn[data-type="location"] .filter-dot { background: var(--col-location); }
+.filter-btn.inactive {
+  opacity: 0.35;
+  border-color: rgba(148,135,103,0.1);
+}
+.filter-btn.inactive .filter-dot { background: var(--ash); }
+
+/* Camera controls */
+.camera-controls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  border-left: 1px solid rgba(148,135,103,0.15);
+  padding-left: var(--sp-md);
+}
+.cam-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(26,18,8,0.6);
+  border: 1px solid rgba(148,135,103,0.2);
+  border-radius: 2px;
+  color: var(--ash-pale);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all var(--t-fast);
+}
+.cam-btn:hover { border-color: rgba(138,112,72,0.5); color: var(--ink-gold); }
+
+/* ============================================================
+   APP BODY
+   ============================================================ */
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ============================================================
+   MAP VIEWPORT
+   ============================================================ */
+.map-viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: var(--parchment-deep);
+  /* Worn parchment: ink-bleed stains, faded grid, darker unexplored edges */
+  background-image:
+    radial-gradient(ellipse 30% 24% at 22% 30%, rgba(20,16,11,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 26% 20% at 78% 68%, rgba(20,16,11,0.3) 0%, transparent 65%),
+    radial-gradient(ellipse 200% 200% at 50% 50%, rgba(44,36,25,0.18) 0%, rgba(20,16,11,0.85) 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 47px, rgba(148,135,103,0.02) 48px),
+    repeating-linear-gradient(90deg, transparent, transparent 47px, rgba(148,135,103,0.02) 48px);
+  cursor: grab;
+}
+.map-viewport:active { cursor: grabbing; }
+
+/* Vignette overlay */
+.map-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 35%, rgba(5,4,3,0.8) 100%);
+  pointer-events: none;
+  z-index: 10;
+  animation: vignetteBreathe 8s ease-in-out infinite;
+}
+@keyframes vignetteBreathe {
+  0%, 100% { opacity: 0.92; }
+  50%      { opacity: 1; }
+}
+
+/* Fog of war — slow drifting mist over the unexplored map edges */
+.map-viewport::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(ellipse 35% 45% at 15% 20%, rgba(60,58,50,0.16) 0%, transparent 65%),
+    radial-gradient(ellipse 30% 40% at 85% 80%, rgba(60,58,50,0.14) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 11;
+  animation: mapFogDrift 50s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes mapFogDrift {
+  from { transform: translate(0,0); }
+  to   { transform: translate(3%, -2%); }
+}
+
+/* Map canvas (panning/zooming target) */
+.map-canvas {
+  position: absolute;
+  transform-origin: 0 0;
+  will-change: transform;
+  /* Transition only for programmatic moves, not drag */
+}
+.map-canvas.animate {
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Grid */
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(17, var(--cell-size));
+  grid-template-rows:    repeat(17, var(--cell-size));
+  gap: var(--cell-gap);
+  padding: var(--sp-lg);
+  position: relative;
+  user-select: none;
+}
+
+/* Row/col labels */
+.axis-label-row,
+.axis-label-col {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(148,135,103,0.25);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+}
+
+/* ============================================================
+   CELLS
+   ============================================================ */
+.map-cell {
+  position: relative;
+  width:  var(--cell-size);
+  height: var(--cell-size);
+  background: rgba(26,18,8,0.6);
+  border: 1px solid rgba(148,135,103,0.08);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.map-cell:hover {
+  background: rgba(61,46,24,0.6);
+  border-color: rgba(148,135,103,0.25);
+  z-index: 2;
+}
+.map-cell.selected {
+  border-color: rgba(138,112,72,0.7) !important;
+  background: rgba(61,46,24,0.7) !important;
+  box-shadow: 0 0 12px rgba(138,112,72,0.25), inset 0 0 8px rgba(138,112,72,0.05) !important;
+  z-index: 3;
+}
+.map-cell.highlighted {
+  background: rgba(74,122,172,0.1) !important;
+  border-color: rgba(74,122,172,0.5) !important;
+  box-shadow: 0 0 10px rgba(74,122,172,0.2) !important;
+}
+.map-cell.has-entities { border-color: rgba(148,135,103,0.15); }
+
+/* coordinate attr tooltip */
+.map-cell::after {
+  content: attr(data-coord);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink-void);
+  border: 1px solid rgba(148,135,103,0.3);
+  border-radius: 2px;
+  color: var(--vellum-light);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast);
+  z-index: 20;
+}
+.map-cell:hover::after { opacity: 1; }
+
+/* ============================================================
+   ENTITY MARKERS
+   ============================================================ */
+.marker-stack {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  /* GPU compositing layer: markers animate/transform frequently */
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  /* Layout containment: internal changes don't affect parent */
+  contain: layout style;
+}
+
+.entity-marker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  pointer-events: none;
+  /* Flashing/appear-disappear animation removed — markers render immediately and stay stable */
+  /* GPU layer for smooth transform during zoom */
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+/* ============================================================
+   LOCATION MARKER — Ancient Runestone
+   A carved weathered stone slab with engraved rune, subtle cracks,
+   and a softly pulsing magical glow. The rune gently shimmers.
+   ============================================================ */
+.marker-location {
+  width: 26px;
+  height: 34px;
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* GPU layer for smooth animation */
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  /* Idle: slow float only — pulsing glow removed to prevent flashing */
+  animation: runeFloat 4s ease-in-out infinite;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)) drop-shadow(0 0 7px rgba(154,130,89,0.3));
+}
+
+/* Stone body — irregular slab shape via layered rounded rects + clip-path */
+.marker-location .rune-stone {
+  position: absolute;
+  inset: 0;
+  background:
+    /* Moss/lichen patches */
+    radial-gradient(ellipse 40% 30% at 20% 80%, rgba(53,84,62,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 25% 20% at 75% 25%, rgba(53,84,62,0.25) 0%, transparent 60%),
+    /* Stone texture grain */
+    repeating-linear-gradient(78deg, rgba(0,0,0,0.03) 0px, transparent 1px, transparent 3px),
+    repeating-linear-gradient(12deg, rgba(0,0,0,0.02) 0px, transparent 1px, transparent 4px),
+    /* Base stone gradient — weathered from light top to dark bottom */
+    linear-gradient(175deg,
+      var(--stone-light) 0%,
+      var(--stone-mid) 35%,
+      var(--stone-dark) 70%,
+      var(--ink-void) 100%
+    );
+  border-radius: 3px 3px 1px 1px;
+  /* Irregular top edge */
+  clip-path: polygon(
+    8% 6%, 22% 0%, 45% 3%, 68% 0%, 88% 5%,
+    100% 14%, 100% 100%, 0% 100%, 0% 14%
+  );
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.06),
+    inset 0 -2px 4px rgba(0,0,0,0.5),
+    0 3px 6px rgba(0,0,0,0.6);
+}
+
+/* Weathering cracks — hairline fractures in the stone */
+.marker-location .rune-crack-1 {
+  position: absolute;
+  top: 12%; left: 35%;
+  width: 1px; height: 38%;
+  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.15), transparent);
+  transform: rotate(-8deg);
+  pointer-events: none;
+  opacity: 0.7;
+}
+.marker-location .rune-crack-2 {
+  position: absolute;
+  top: 45%; right: 28%;
+  width: 1px; height: 22%;
+  background: linear-gradient(180deg, rgba(0,0,0,0.35), transparent);
+  transform: rotate(14deg);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Chipped edge — a small missing piece at bottom-left */
+.marker-location .rune-chip {
+  position: absolute;
+  bottom: 2px; left: 2px;
+  width: 5px; height: 5px;
+  background: var(--parchment-deep);
+  border-radius: 0 50% 0 0;
+  opacity: 0.6;
+}
+
+/* Engraved rune in the centre — softly glowing */
+.marker-location .rune-glyph {
+  position: relative;
+  z-index: 2;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--col-location);
+  text-shadow:
+    0 0 4px rgba(154,130,89,0.6),
+    0 0 10px rgba(154,130,89,0.25);
+  /* Shimmer removed to prevent flashing — rune stays steadily visible */
+  /* Slight inset effect — carved into stone */
+  filter: drop-shadow(0 -1px 0 rgba(0,0,0,0.5)) drop-shadow(0 1px 0 rgba(255,255,255,0.04));
+  transform: translate3d(0, 0, 0);
+}
+
+/* Ambient glow beneath the stone */
+.marker-location .rune-aura {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(154,130,89,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Hover state */
+.marker-location:hover {
+  animation: runeFloatHover 3s ease-in-out infinite;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.65)) drop-shadow(0 0 10px rgba(154,130,89,0.45));
+}
+.marker-location:hover .rune-stone {
+  filter: brightness(1.08);
+}
+.marker-location:hover .rune-glyph {
+  text-shadow:
+    0 0 6px rgba(154,130,89,0.9),
+    0 0 16px rgba(154,130,89,0.4),
+    0 0 28px rgba(154,130,89,0.15);
+}
+
+/* ── Animations ── */
+
+/* Slow floating: 1–2px vertical drift */
+@keyframes runeFloat {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, -2px, 0); }
+}
+@keyframes runeFloatHover {
+  0%, 100% { transform: translate3d(0, -1px, 0) scale(1.08); }
+  50%      { transform: translate3d(0, -3px, 0) scale(1.08); }
+}
+
+/* Breathing glow, shimmer, and aura-pulse keyframes removed — they caused
+   flashing/pulsing on markers. Static glow values are set directly above. */
+
+/* ============================================================
+   PLAYER MARKER — glowing blue relic / magical compass
+   ============================================================ */
+.marker-player {
+  width: 26px; height: 26px;
+  background: radial-gradient(circle at 35% 30%, rgba(110,165,205,0.9), rgba(16,40,64,0.96));
+  border: 1px solid var(--sapphire-pale);
+  transform: rotate(45deg);
+  border-radius: 3px;
+  box-shadow: 0 0 10px rgba(63,106,144,0.55), 0 0 22px rgba(63,106,144,0.2), inset 0 1px 2px rgba(180,210,230,0.25);
+  font-size: 0;
+  /* Appear + breathing-glow animation removed to prevent flashing — static glow instead */
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+  /* GPU compositing for zoom stability */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+/* Rotating compass ring — the "magical compass" field around the relic */
+.marker-player::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border: 1px dashed rgba(63,106,144,0.45);
+  border-radius: 50%;
+  animation: compassSpin 12s linear infinite;
+}
+@keyframes compassSpin {
+  from { transform: rotate(-45deg); }
+  to   { transform: rotate(315deg); }
+}
+.marker-player .player-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transform: rotate(-45deg);
+  line-height: 1;
+  color: #cfe4f5;
+}
+/* playerBreathe keyframes removed — glow is now static (see .marker-player box-shadow) */
+
+/* ============================================================
+   NPC MARKER — wax seal / bronze medallion
+   ============================================================ */
+.marker-npc {
+  width: 26px; height: 26px;
+  background: radial-gradient(circle at 35% 30%, rgba(150,120,70,0.85), rgba(50,32,10,0.96));
+  border: 2px solid var(--ink-gold);
+  border-radius: 50%;
+  /* Scalloped wax-seal edge via layered radial dents */
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.55),
+    0 0 7px rgba(138,112,72,0.28),
+    inset 0 1px 2px rgba(203,185,138,0.15),
+    inset 0 0 0 3px rgba(20,16,11,0.35);
+  font-size: 12px;
+  z-index: 1;
+  position: relative;
+  /* GPU compositing for zoom stability */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.marker-npc::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(203,185,138,0.25);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ============================================================
+   ENEMY MARKER — cracked skull emblem / blood rune
+   ============================================================ */
+.marker-enemy {
+  width: 26px; height: 26px;
+  background: radial-gradient(circle at 40% 35%, rgba(120,30,30,0.85), rgba(20,4,4,0.96));
+  border: 2px solid var(--crimson);
+  border-radius: 50%;
+  font-size: 12px;
+  z-index: 1;
+  position: relative;
+  color: #d99;
+  /* Appear + pulse animation removed to prevent flashing — static glow instead */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.65), 0 0 9px rgba(110,28,28,0.4), 0 0 10px rgba(110,28,28,0.5);
+  /* GPU compositing for zoom stability */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+/* Cracks radiating from the sigil, like a fractured seal */
+.marker-enemy::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(168,58,58,0.35);
+  border-radius: 50%;
+}
+.marker-enemy::after {
+  content: '';
+  position: absolute;
+  top: 15%; left: 48%;
+  width: 1px; height: 70%;
+  background: rgba(0,0,0,0.55);
+  transform: rotate(18deg);
+}
+/* enemyPulse keyframes removed — glow is now static (see .marker-enemy box-shadow) */
+
+/* Multiple entities stacking */
+.multi-indicator {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 16px; height: 16px;
+  background: linear-gradient(180deg, var(--iron-mid), var(--iron-dark));
+  border: 1px solid rgba(154,130,89,0.5);
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  color: var(--vellum-light);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+  font-weight: bold;
+  z-index: 5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+.sidebar {
+  width: 320px;
+  background:
+    repeating-linear-gradient(125deg, rgba(0,0,0,0.08) 0px, transparent 3px, transparent 7px),
+    radial-gradient(ellipse 140% 60% at 50% 0%, rgba(44,36,25,0.4) 0%, transparent 60%),
+    var(--ink-void);
+  border-left: 1px solid rgba(154,130,89,0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(100%);
+  transition: transform var(--t-mid) cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 50;
+  box-shadow: inset 8px 0 24px rgba(0,0,0,0.4);
+}
+.sidebar.open { transform: translateX(0); }
+.sidebar.pinned { transform: translateX(0); }
+
+/* Decorative sidebar top seam — engraved brass line */
+.sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(122,97,54,0.6), transparent);
+}
+
+/* Brass corner fittings — like the metal reinforcements on an old journal cover */
+.sidebar::after {
+  content: '';
+  position: absolute;
+  inset: 6px 10px auto auto;
+  top: 6px; right: 8px;
+  width: 14px; height: 14px;
+  border-top: 2px solid rgba(122,97,54,0.5);
+  border-right: 2px solid rgba(122,97,54,0.5);
+  pointer-events: none;
+}
+
+.sidebar-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-md) var(--sp-lg);
+  border-bottom: 1px solid rgba(154,130,89,0.12);
+  flex-shrink: 0;
+}
+/* Engraved separator glow beneath the header */
+.sidebar-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: var(--sp-lg); right: var(--sp-lg);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(154,130,89,0.35), transparent);
+}
+.sidebar-coords {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: var(--ink-gold);
+  letter-spacing: 0.1em;
+}
+.sidebar-subtitle {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ash);
+  margin-top: 2px;
+}
+.sidebar-actions {
+  display: flex;
+  gap: var(--sp-xs);
+}
+
+.sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-md) var(--sp-lg);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,135,103,0.2) transparent;
+}
+.sidebar-body::-webkit-scrollbar { width: 4px; }
+.sidebar-body::-webkit-scrollbar-thumb { background: rgba(148,135,103,0.2); border-radius: 2px; }
+
+/* Empty state */
+.sidebar-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: var(--sp-md);
+  color: var(--ash);
+  font-style: italic;
+  font-size: 13px;
+  text-align: center;
+}
+.sidebar-empty-sigil {
+  width: 50px; height: 50px;
+  border: 1px dashed rgba(148,135,103,0.2);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  color: rgba(148,135,103,0.2);
+}
+
+/* Entity cards */
+.entity-section {
+  margin-bottom: var(--sp-lg);
+}
+.entity-section-title {
+  position: relative;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ash);
+  padding-bottom: var(--sp-xs);
+  border-bottom: 1px solid rgba(154,130,89,0.16);
+  margin-bottom: var(--sp-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+/* Engraved second hairline beneath the border for a chiseled look */
+.entity-section-title::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -2px;
+  height: 1px;
+  background: rgba(0,0,0,0.5);
+}
+.entity-section-title .section-count {
+  background: rgba(154,130,89,0.12);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 9px;
+}
+
+.entity-card {
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.015) 0px, transparent 2px, transparent 6px),
+    rgba(20,16,11,0.65);
+  border: 1px solid rgba(154,130,89,0.14);
+  border-radius: 3px;
+  padding: var(--sp-sm) var(--sp-md);
+  margin-bottom: var(--sp-xs);
+  animation: cardSlide 0.3s ease both;
+  transition: border-color var(--t-fast), background var(--t-fast), box-shadow var(--t-fast);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.entity-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+}
+.entity-card.type-location::before { background: var(--col-location); }
+.entity-card.type-player::before   { background: var(--col-player); }
+.entity-card.type-npc::before      { background: var(--col-npc); }
+.entity-card.type-enemy::before    { background: var(--col-enemy); }
+
+.entity-card:hover {
+  border-color: rgba(154,130,89,0.3);
+  background:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.02) 0px, transparent 2px, transparent 6px),
+    rgba(32,26,18,0.75);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+}
+@keyframes cardSlide {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: 4px;
+}
+.card-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.card-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--ghost-gold);
+  letter-spacing: 0.04em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-type-badge {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+/* Location badge uses the weathered bronze-stone rune-monument tint */
+.type-location .card-type-badge { color: var(--col-location); background: rgba(154,130,89,0.14); }
+.type-player   .card-type-badge { color: var(--col-player);   background: rgba(63,106,144,0.18); }
+.type-npc      .card-type-badge { color: var(--col-npc);      background: rgba(138,112,72,0.16); }
+.type-enemy    .card-type-badge { color: var(--col-enemy);    background: rgba(168,58,58,0.16); }
+
+.card-class {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ash-pale);
+  margin-bottom: 6px;
+}
+
+/* Health bar */
+.health-wrap {
+  margin: 6px 0;
+}
+.health-label {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ash);
+  margin-bottom: 3px;
+}
+.health-label .hp-val { color: var(--vellum-pale); }
+.health-bar-bg {
+  height: 4px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.health-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.6s ease, background-color 0.4s ease;
+}
+.health-bar-fill.hp-high   { background: var(--verdigris-pale); }
+.health-bar-fill.hp-medium { background: var(--ink-gold); }
+.health-bar-fill.hp-low    { background: var(--crimson-pale); box-shadow: 0 0 4px rgba(201,64,64,0.5); }
+
+/* Glint sweep — shown when health exceeds the 20 HP max, as a subtle
+   "overcharged" shine crossing the filled bar. This is a deliberate,
+   requested effect on the sidebar HP bar (not a map marker), so it is
+   exempt from the marker no-flashing rule. */
+.health-bar-fill.hp-glint {
+  position: relative;
+  overflow: hidden;
+}
+.health-bar-fill.hp-glint::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0.75) 45%, transparent 90%);
+  transform: translateX(-150%) skewX(-18deg);
+  animation: hpGlintSweep 2.2s ease-in-out infinite;
+}
+@keyframes hpGlintSweep {
+  0%   { transform: translateX(-150%) skewX(-18deg); }
+  55%  { transform: translateX(280%) skewX(-18deg); }
+  100% { transform: translateX(280%) skewX(-18deg); }
+}
+
+/* Flashing light — shown when HP is 0 or below, to signal a downed/dead
+   entity. This is a deliberate alert state (distinct from the earlier
+   marker no-flash fix), so a rapid, attention-grabbing blink is intended
+   here. */
+.health-wrap.hp-critical .health-label,
+.health-wrap.hp-critical .hp-val {
+  color: var(--crimson-pale);
+}
+.health-bar-bg {
+  position: relative;
+}
+.hp-flash-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: var(--crimson-pale);
+  box-shadow: 0 0 6px 1px rgba(201,64,64,0.8);
+  animation: hpFlashLight 0.7s steps(1, end) infinite;
+}
+@keyframes hpFlashLight {
+  0%, 49%  { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* Stat grid */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+.stat-cell {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(148,135,103,0.08);
+  border-radius: 2px;
+  padding: 4px 3px;
+  text-align: center;
+}
+.stat-abbr {
+  font-family: var(--font-ui);
+  font-size: 7px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ash);
+  display: block;
+}
+.stat-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--vellum-pale);
+  line-height: 1.2;
+}
+
+/* Location card specifics */
+.location-name {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ash-pale);
+  margin-top: 4px;
+}
+
+/* ============================================================
+   TOOLTIPS / MINI POPUP
+   ============================================================ */
+.cell-tooltip {
+  position: fixed;
+  background: var(--ink-void);
+  border: 1px solid rgba(148,135,103,0.3);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--vellum-pale);
+  pointer-events: none;
+  z-index: 200;
+  max-width: 200px;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+}
+.cell-tooltip.visible { opacity: 1; }
+.tooltip-entry { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.tooltip-icon { font-size: 14px; }
+.tooltip-name { color: var(--ghost-gold); }
+
+/* ============================================================
+   MAP DECORATIVE FRAME
+   ============================================================ */
+.map-viewport::before {
+  content: '';
+  position: absolute;
+  inset: 16px;
+  border: 1px solid rgba(148,135,103,0.06);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Terrain variety for empty cells via nth-child patterns */
+.map-cell:nth-child(3n+1)   { background: rgba(24,17,7,0.65); }
+.map-cell:nth-child(5n+2)   { background: rgba(30,22,10,0.55); }
+.map-cell:nth-child(7n)     { background: rgba(20,18,10,0.70); }
+.map-cell:nth-child(11n+3)  { background: rgba(28,20,8,0.60); }
+
+/* Subtle inner texture on cells */
+.map-cell:nth-child(13n) {
+  background-image: radial-gradient(circle at 70% 30%, rgba(148,135,103,0.03), transparent 60%);
+}
+
+/* ============================================================
+   SCROLLBAR global
+   ============================================================ */
+* { scrollbar-width: thin; scrollbar-color: rgba(148,135,103,0.15) transparent; }
+*::-webkit-scrollbar { width: 5px; height: 5px; }
+*::-webkit-scrollbar-thumb { background: rgba(148,135,103,0.15); border-radius: 3px; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 768px) {
+  .sidebar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    width: 100%;
+    height: 55%;
+    transform: translateY(100%);
+    border-left: none;
+    border-top: 1px solid rgba(148,135,103,0.2);
+  }
+  .sidebar.open, .sidebar.pinned { transform: translateY(0); }
+
+  .world-title,
+  .timestamp,
+  .room-chip { display: none; }
+
+  .coord-wrap { display: none; }
+
+  :root { --cell-size: 38px; }
+}
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+}
+
+.animate-health-change {
+  animation: healthChange 0.6s ease;
+}
+@keyframes healthChange {
+  0%   { background: rgba(138,112,72,0.3); }
+  100% { background: transparent; }
+}
+
+/* entity-moved opacity-dip animation removed — it caused markers to flash
+   on every live update. Marker DOM elements are now updated in place
+   without any visibility animation (see scheduleMarkerAnimation in JS). */
+
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     GLOBAL CINEMATIC ATMOSPHERE — fog, grain, vignette, embers.
+     Purely decorative, sits above all screens, never intercepts input.
+     ============================================================ -->
+<div class="world-atmosphere" aria-hidden="true">
+  <div class="atmo-fog"></div>
+  <div class="atmo-dust" id="atmo-dust"></div>
+  <div class="atmo-ash" id="atmo-ash"></div>
+  <div class="atmo-grain"></div>
+  <div class="atmo-vignette"></div>
+</div>
+
+<!-- ============================================================
+     LANDING SCREEN
+     ============================================================ -->
+<div id="screen-landing" class="screen visible" role="main" aria-label="Atlas of Echoes — Enter World">
+
+  <!-- Animated background layers -->
+  <div class="landing-bg" aria-hidden="true">
+    <div class="compass-lines"></div>
+    <div class="star-field" id="star-field"></div>
+    <div class="rune-field" id="rune-field"></div>
+    <div class="landing-glow"></div>
+  </div>
+
+  <!-- Main content -->
+  <div class="landing-content">
+    <!-- Sigil mark -->
+    <div class="logo-sigil" aria-hidden="true">
+      <div class="sigil-center"></div>
+    </div>
+
+    <div>
+      <p class="logo-eyebrow">Cartographic Companion</p>
+      <h1 class="logo-title">Atlas of Echoes</h1>
+      <p class="logo-subtitle">A living chart of worlds in motion — where every mark upon the map breathes with the weight of those who wander it.</p>
+    </div>
+
+    <!-- Entry form -->
+    <div class="entry-form">
+      <label class="input-label" for="room-id-input">Room Inscription</label>
+      <div class="room-input-wrap">
+        <input
+          type="text"
+          id="room-id-input"
+          placeholder="Enter Your Room ID"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="room-id-hint"
+        >
+      </div>
+      <span id="room-id-hint" class="visually-hidden">Enter the Room ID provided by your Game Master</span>
+      <button class="enter-btn" id="enter-btn" aria-label="Enter the world">
+        ✦ &nbsp; Enter World &nbsp; ✦
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="landing-footer" aria-hidden="true">
+    <p>«&thinsp;In the age before the Silence, cartographers did not draw roads — they drew possibilities.&thinsp;»</p>
+  </div>
+</div>
+
+<!-- ============================================================
+     LOADING SCREEN
+     ============================================================ -->
+<div id="screen-loading" class="screen hidden" aria-live="polite" aria-label="Loading world data">
+  <canvas class="constellation-canvas" id="constellation-canvas" aria-hidden="true"></canvas>
+
+  <div class="loading-compass" aria-hidden="true">
+    <div class="compass-ring"></div>
+    <div class="compass-ring"></div>
+    <div class="compass-ring"></div>
+    <div class="compass-needle n"></div>
+    <div class="compass-needle s"></div>
+    <div class="compass-center"></div>
+    <span class="compass-cardinal n-label">N</span>
+    <span class="compass-cardinal s-label">S</span>
+    <span class="compass-cardinal e-label">E</span>
+    <span class="compass-cardinal w-label">W</span>
+  </div>
+
+  <p class="loading-text">
+    <em>Charting the World<span class="loading-dots"></span></em>
+  </p>
+</div>
+
+<!-- ============================================================
+     ERROR SCREEN
+     ============================================================ -->
+<div id="screen-error" class="screen hidden" role="alert" aria-label="Connection failed">
+  <div class="error-illustration" aria-hidden="true">
+    <div class="err-ring err-ring-1"></div>
+    <div class="err-ring err-ring-2"></div>
+    <div class="err-crack"></div>
+    <div class="err-crack"></div>
+    <div class="err-crack"></div>
+    <div class="err-center"></div>
+  </div>
+
+  <h2 class="error-title">The Compass Has Lost Its Way</h2>
+  <p class="error-message" id="error-detail">The cartographic signal could not be established. The world may be beyond reach — or the inscription was penned in error.</p>
+
+  <div class="error-room-wrap">
+    <input type="text" id="error-room-id" placeholder="Room code" aria-label="Room ID" spellcheck="false">
+    <button class="retry-btn" id="retry-btn">✦ Retry</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN APP SCREEN
+     ============================================================ -->
+<div id="screen-app" class="screen hidden" aria-label="World map">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="header-logo" id="back-to-landing" role="button" tabindex="0" title="Return to entrance">
+        Atlas<span></span>of Echoes
+      </div>
+      <div class="world-title" id="world-title"></div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Connected</span>
+      </div>
+      <div class="room-chip" id="header-room-chip"></div>
+      <div class="timestamp" id="last-updated"></div>
+      <button class="icon-btn" id="sidebar-pin-btn" title="Pin sidebar" aria-label="Pin sidebar">⊞</button>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="app-toolbar" role="toolbar" aria-label="Map tools">
+    <!-- Search -->
+    <div class="search-wrap">
+      <span class="search-icon" aria-hidden="true">⌕</span>
+      <input type="search" id="search-input" placeholder="Search entities, locations…" aria-label="Search entities">
+    </div>
+
+    <!-- Coordinate jump -->
+    <div class="coord-wrap">
+      <label class="input-label" for="coord-x">X</label>
+      <input type="number" class="coord-input" id="coord-x" min="0" max="16" aria-label="X coordinate" placeholder="0">
+      <label class="input-label" for="coord-y">Y</label>
+      <input type="number" class="coord-input" id="coord-y" min="0" max="16" aria-label="Y coordinate" placeholder="0">
+      <button class="goto-btn" id="goto-btn" aria-label="Go to coordinates">Go</button>
+    </div>
+
+    <div class="filter-divider" aria-hidden="true"></div>
+
+    <!-- Filters -->
+    <div class="filter-group" role="group" aria-label="Entity filters">
+      <button class="filter-btn active" data-type="player" aria-pressed="true">
+        <span class="filter-dot"></span>Players
+      </button>
+      <button class="filter-btn active" data-type="npc" aria-pressed="true">
+        <span class="filter-dot"></span>NPCs
+      </button>
+      <button class="filter-btn active" data-type="enemy" aria-pressed="true">
+        <span class="filter-dot"></span>Enemies
+      </button>
+      <button class="filter-btn active" data-type="location" aria-pressed="true">
+        <span class="filter-dot"></span>Locations
+      </button>
+    </div>
+
+    <div class="filter-divider" aria-hidden="true"></div>
+
+    <!-- Camera controls -->
+    <div class="camera-controls" role="group" aria-label="Camera controls">
+      <button class="cam-btn" id="zoom-in-btn"  title="Zoom in"  aria-label="Zoom in">+</button>
+      <button class="cam-btn" id="zoom-out-btn" title="Zoom out" aria-label="Zoom out">−</button>
+      <button class="cam-btn" id="reset-cam-btn" title="Reset view" aria-label="Reset camera">⊙</button>
+    </div>
+  </div>
+
+  <!-- APP BODY -->
+  <div class="app-body">
+
+    <!-- MAP VIEWPORT -->
+    <div class="map-viewport" id="map-viewport" role="region" aria-label="World map grid">
+      <div class="map-vignette" aria-hidden="true"></div>
+      <div class="map-canvas" id="map-canvas">
+        <div class="map-grid" id="map-grid" role="grid" aria-label="Map grid"></div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar" aria-label="Selected tile information">
+      <div class="sidebar-header">
+        <div>
+          <div class="sidebar-coords" id="sidebar-coords">—</div>
+          <div class="sidebar-subtitle">Selected Coordinates</div>
+        </div>
+        <div class="sidebar-actions">
+          <button class="icon-btn" id="close-sidebar-btn" title="Close panel" aria-label="Close sidebar">✕</button>
+        </div>
+      </div>
+      <div class="sidebar-body" id="sidebar-body">
+        <div class="sidebar-empty">
+          <div class="sidebar-empty-sigil">✦</div>
+          <p>Select a tile upon the map to reveal what dwells within.</p>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Cell hover tooltip -->
+<div class="cell-tooltip" id="cell-tooltip" role="tooltip" aria-hidden="true"></div>
+
+<script>
+/* ============================================================
+   ATLAS OF ECHOES — Application Logic
+   ============================================================ */
+
+'use strict';
+
+/* ============================================================
+   APPLICATION STATE
+   ============================================================ */
+const State = {
+  roomId:          '',
+  worldTitle:      '',
+  entities:        [],      // raw entity array from API
+  entityMap:       {},      // {x_y: [entity,...]}
+  filters:         { player: true, npc: true, enemy: true, location: true },
+  camera:          { x: 0, y: 0, scale: 1 },
+  selectedCell:    null,    // {x, y}
+  sidebarPinned:   false,
+  sidebarOpen:     false,
+  searchQuery:     '',
+  highlightedCells: new Set(),
+  updateInterval:  null,
+  lastUpdateTime:  null,
+  isDragging:      false,
+  dragStart:       { x: 0, y: 0 },
+  cameraStart:     { x: 0, y: 0 },
+  touchStart:      null,
+  touchDist:       null,
+  locationIndex:   {},      // name -> {x,y} for placing entities without valid coords
+};
+
+const GRID_SIZE  = 17;
+const CELL_SIZE  = 50; // px including gap
+const UPDATE_MS  = 5000;
+
+const API_BASE   = 'https://erma-pseudosyphilitic-unwonderfully.ngrok-free.dev/webhook/a2d01c4d-7845-41ca-94ce-972390782353/data/';
+
+/* ============================================================
+   API COMMUNICATION
+   ============================================================ */
+async function fetchWorldData(roomId) {
+  const url = `${API_BASE}${encodeURIComponent(roomId)}`;
+  const response = await fetch(url, {
+    headers: { 'ngrok-skip-browser-warning': '1' }
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const json = await response.json();
+  if (!Array.isArray(json) || json.length === 0) throw new Error('Empty world data');
+  return json[0];
+}
+
+/* ============================================================
+   GLOBAL ATMOSPHERE — drifting dust & ash particles
+   ============================================================ */
+function initAtmosphere() {
+  const dust = document.getElementById('atmo-dust');
+  for (let i = 0; i < 26; i++) {
+    const p = document.createElement('span');
+    p.style.cssText = `
+      left:${Math.random()*100}%;
+      animation-duration:${(Math.random()*14+14).toFixed(1)}s;
+      animation-delay:${(Math.random()*14).toFixed(1)}s;
+    `;
+    dust.appendChild(p);
+  }
+  const ash = document.getElementById('atmo-ash');
+  for (let i = 0; i < 16; i++) {
+    const p = document.createElement('span');
+    p.style.cssText = `
+      left:${Math.random()*100}%;
+      animation-duration:${(Math.random()*20+18).toFixed(1)}s;
+      animation-delay:${(Math.random()*18).toFixed(1)}s;
+    `;
+    ash.appendChild(p);
+  }
+}
+
+/* ============================================================
+   LANDING PAGE SETUP
+   ============================================================ */
+function initLanding() {
+  // Stars
+  const field = document.getElementById('star-field');
+  for (let i = 0; i < 180; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    s.style.cssText = `
+      width:${size}px; height:${size}px;
+      top:${Math.random()*100}%;
+      left:${Math.random()*100}%;
+      animation-duration:${(Math.random()*3+1.5).toFixed(1)}s;
+      animation-delay:${(Math.random()*3).toFixed(1)}s;
+      opacity:${(Math.random()*0.6+0.1).toFixed(2)};
+    `;
+    field.appendChild(s);
+  }
+
+  // Runes — using geometric Unicode symbols as faux-runes
+  const RUNE_CHARS = ['⊕','⊗','⊙','⊛','⊞','⊟','⊠','◈','◉','◎','◍','◌','⌖','⌗','⌘','⋈','⋆','⋇','✦','✧','⟡','⟢','⟣','⎔','⌂'];
+  const runeField = document.getElementById('rune-field');
+  for (let i = 0; i < 18; i++) {
+    const r = document.createElement('div');
+    r.className = 'rune';
+    r.textContent = RUNE_CHARS[Math.floor(Math.random() * RUNE_CHARS.length)];
+    r.style.cssText = `
+      left:${Math.random()*95}%;
+      bottom:${-Math.random()*10}%;
+      animation-duration:${(Math.random()*20+15).toFixed(0)}s;
+      animation-delay:${(Math.random()*10).toFixed(1)}s;
+      font-size:${Math.floor(Math.random()*24+14)}px;
+    `;
+    runeField.appendChild(r);
+  }
+
+  // Enter World button
+  document.getElementById('enter-btn').addEventListener('click', handleEnterWorld);
+  document.getElementById('room-id-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleEnterWorld();
+  });
+}
+
+async function handleEnterWorld() {
+  const input = document.getElementById('room-id-input');
+  const roomId = input.value.trim();
+  if (!roomId) {
+    input.style.borderColor = 'rgba(201,64,64,0.7)';
+    input.focus();
+    setTimeout(() => input.style.borderColor = '', 1500);
+    return;
+  }
+  State.roomId = roomId;
+  showScreen('loading');
+  stopConstellationAnimation();
+  startConstellationAnimation();
+  await loadWorld(roomId);
+}
+
+/* ============================================================
+   SCREEN MANAGEMENT
+   ============================================================ */
+function showScreen(name) {
+  const ids = { landing: 'screen-landing', loading: 'screen-loading', error: 'screen-error', app: 'screen-app' };
+  Object.entries(ids).forEach(([key, id]) => {
+    const el = document.getElementById(id);
+    if (key === name) {
+      el.classList.remove('hidden');
+      el.classList.add('visible');
+    } else {
+      el.classList.remove('visible');
+      el.classList.add('hidden');
+    }
+  });
+}
+
+/* ============================================================
+   WORLD LOADING
+   ============================================================ */
+async function loadWorld(roomId) {
+  try {
+    const data = await fetchWorldData(roomId);
+    State.worldTitle = data.title || 'Unknown World';
+    processEntities(data.map || []);
+    initApp();
+    // Brief pause so loading screen registers before transition
+    await new Promise(r => setTimeout(r, 500));
+    stopConstellationAnimation();
+    showScreen('app');
+    // Reset camera after layout settles
+    requestAnimationFrame(() => { requestAnimationFrame(centerCamera); });
+    startLiveUpdates();
+  } catch (err) {
+    console.error('Failed to load world:', err);
+    stopConstellationAnimation();
+    showError(err.message);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('error-detail').textContent =
+    'The cartographic signal could not be established. ' +
+    (msg ? `(${msg})` : 'The world may be beyond reach.');
+  document.getElementById('error-room-id').value = State.roomId;
+  showScreen('error');
+  stopConstellationAnimation();
+}
+
+function processEntities(rawEntities) {
+  // Build location index first
+  State.locationIndex = {};
+  rawEntities.forEach(e => {
+    if (e.type === 'location' && e.x >= 0 && e.x < GRID_SIZE && e.y >= 0 && e.y < GRID_SIZE) {
+      State.locationIndex[e.name] = { x: e.x, y: e.y };
+    }
+  });
+
+  // Assign coordinates to entities with invalid x/y
+  const usedPositions = new Set();
+  rawEntities.forEach(e => {
+    if (e.x >= 0 && e.x < GRID_SIZE && e.y >= 0 && e.y < GRID_SIZE) {
+      usedPositions.add(`${e.x}_${e.y}`);
+    }
+  });
+
+  State.entities = rawEntities.map(e => {
+    let { x, y } = e;
+    if (x == null || y == null || x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+      // Try to place near a named location
+      if (e.location && State.locationIndex[e.location]) {
+        const loc = State.locationIndex[e.location];
+        const adj = findAdjacentFree(loc.x, loc.y, usedPositions);
+        x = adj.x; y = adj.y;
+      } else {
+        // Find any free cell
+        const free = findFreeCell(usedPositions);
+        x = free.x; y = free.y;
+      }
+      usedPositions.add(`${x}_${y}`);
+    }
+    return { ...e, x, y };
+  });
+
+  buildEntityMap();
+}
+
+function findAdjacentFree(cx, cy, used) {
+  const offsets = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1],[2,0],[0,2]];
+  for (const [dx, dy] of offsets) {
+    const nx = cx+dx, ny = cy+dy;
+    if (nx>=0&&nx<GRID_SIZE&&ny>=0&&ny<GRID_SIZE) {
+      const key = `${nx}_${ny}`;
+      if (!used.has(key)) return { x: nx, y: ny };
+    }
+  }
+  return findFreeCell(used);
+}
+
+function findFreeCell(used) {
+  for (let y=0; y<GRID_SIZE; y++) {
+    for (let x=0; x<GRID_SIZE; x++) {
+      if (!used.has(`${x}_${y}`)) return { x, y };
+    }
+  }
+  return { x: Math.floor(Math.random()*GRID_SIZE), y: Math.floor(Math.random()*GRID_SIZE) };
+}
+
+function buildEntityMap() {
+  State.entityMap = {};
+  State.entities.forEach(e => {
+    const key = `${e.x}_${e.y}`;
+    if (!State.entityMap[key]) State.entityMap[key] = [];
+    State.entityMap[key].push(e);
+  });
+}
+
+/* ============================================================
+   GRID GENERATION
+   ============================================================ */
+function initApp() {
+  // Header
+  document.getElementById('world-title').textContent = State.worldTitle;
+  document.getElementById('header-room-chip').textContent = State.roomId;
+  updateTimestamp();
+
+  // Build grid
+  buildGrid();
+
+  // Center camera on map
+  centerCamera();
+
+  // Render entities
+  renderAllEntities();
+}
+
+function buildGrid() {
+  const grid = document.getElementById('map-grid');
+  grid.innerHTML = '';
+
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const cell = document.createElement('div');
+      cell.className = 'map-cell';
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+      cell.dataset.coord = `${x}, ${y}`;
+      cell.setAttribute('role', 'gridcell');
+      cell.setAttribute('aria-label', `Tile ${x},${y}`);
+      cell.tabIndex = 0;
+
+      // Marker container
+      const stack = document.createElement('div');
+      stack.className = 'marker-stack';
+      stack.id = `stack-${x}-${y}`;
+      cell.appendChild(stack);
+
+      cell.addEventListener('click', () => handleCellClick(x, y, cell));
+      cell.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') handleCellClick(x, y, cell); });
+      cell.addEventListener('mouseenter', e => showCellTooltip(x, y, e));
+      cell.addEventListener('mouseleave', hideCellTooltip);
+
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function getCell(x, y) {
+  return document.querySelector(`.map-cell[data-x="${x}"][data-y="${y}"]`);
+}
+
+/* ============================================================
+   ENTITY RENDERING — Diff-based to prevent mobile flicker
+   ============================================================ */
+function renderAllEntities() {
+  // Diff-based: only update cells whose entity set changed.
+  // Build current DOM state as a lightweight fingerprint.
+  const domFingerprints = new Map(); // key -> "type1:name1|type2:name2..."
+  document.querySelectorAll('.marker-stack').forEach(stack => {
+    const cell = stack.closest('.map-cell');
+    if (!cell) return;
+    const key = `${cell.dataset.x}_${cell.dataset.y}`;
+    const markers = stack.querySelectorAll('.entity-marker');
+    const fp = Array.from(markers).map(m => m.dataset.etype + ':' + m.dataset.ename).sort().join('|');
+    domFingerprints.set(key, fp);
+  });
+
+  // Determine which cells need updating
+  Object.entries(State.entityMap).forEach(([key, entities]) => {
+    const [x, y] = key.split('_').map(Number);
+    const visible = entities.filter(e => State.filters[e.type] !== false);
+    const desiredFp = visible.map(e => e.type + ':' + e.name).sort().join('|');
+    const currentFp = domFingerprints.get(key) || '';
+    if (desiredFp !== currentFp) {
+      renderCellEntities(x, y, entities);
+    }
+  });
+
+  // Clean up cells that no longer have entities
+  document.querySelectorAll('.map-cell.has-entities').forEach(cell => {
+    const key = `${cell.dataset.x}_${cell.dataset.y}`;
+    if (!State.entityMap[key] || State.entityMap[key].filter(e => State.filters[e.type] !== false).length === 0) {
+      const stack = cell.querySelector('.marker-stack');
+      if (stack) stack.innerHTML = '';
+      cell.classList.remove('has-entities');
+    }
+  });
+}
+
+function renderCellEntities(x, y, entities) {
+  const stack = document.getElementById(`stack-${x}-${y}`);
+  const cell  = getCell(x, y);
+  if (!stack || !cell) return;
+
+  const visible = entities.filter(e => State.filters[e.type] !== false);
+  if (visible.length === 0) {
+    cell.classList.remove('has-entities');
+    stack.innerHTML = '';
+    return;
+  }
+
+  cell.classList.add('has-entities');
+
+  // Determine what marker to show
+  const hasLocation = visible.some(e => e.type === 'location');
+  const players = visible.filter(e => e.type === 'player');
+
+  // Build desired marker fingerprint for diffing
+  let primaryEntity = null;
+  let markerType = '';
+
+  if (hasLocation) {
+    // Default: show the runestone
+    markerType = 'location';
+    primaryEntity = visible.find(e => e.type === 'location');
+  } else {
+    // Priority: enemy > player > npc
+    const priority = { enemy: 4, player: 3, npc: 2 };
+    const sorted = [...visible].sort((a, b) => (priority[b.type] || 0) - (priority[a.type] || 0));
+    primaryEntity = sorted[0];
+    markerType = primaryEntity.type;
+  }
+
+  const rest = visible.filter(e => e !== primaryEntity);
+
+  // Check if current stack already has the right marker
+  const existing = stack.querySelector('.entity-marker');
+  if (existing && existing.dataset.etype === markerType && existing.dataset.ename === (primaryEntity?.name || '')) {
+    // Update multi-indicator only
+    const existingInd = existing.querySelector('.multi-indicator');
+    if (rest.length > 0) {
+      if (existingInd) {
+        existingInd.textContent = `+${rest.length}`;
+      } else {
+        const ind = document.createElement('div');
+        ind.className = 'multi-indicator';
+        ind.textContent = `+${rest.length}`;
+        existing.appendChild(ind);
+      }
+    } else if (existingInd) {
+      existingInd.remove();
+    }
+    return;
+  }
+
+  // Full rebuild needed
+  stack.innerHTML = '';
+  const marker = createMarker(primaryEntity);
+  if (marker) {
+    if (rest.length > 0) {
+      const ind = document.createElement('div');
+      ind.className = 'multi-indicator';
+      ind.textContent = `+${rest.length}`;
+      marker.appendChild(ind);
+    }
+    stack.appendChild(marker);
+  }
+}
+
+function createMarker(entity) {
+  const wrap = document.createElement('div');
+  wrap.className = `entity-marker marker-${entity.type}`;
+  wrap.dataset.etype = entity.type;
+  wrap.dataset.ename = entity.name || '';
+  wrap.title = entity.name || '';
+
+  if (entity.type === 'player') {
+    const inner = document.createElement('span');
+    inner.className = 'player-inner';
+    inner.textContent = entity.icon || '⚔';
+    wrap.appendChild(inner);
+  } else if (entity.type === 'location') {
+    // Runestone structure: stone body + cracks + chip + aura + glyph
+    const stone = document.createElement('div');
+    stone.className = 'rune-stone';
+    const crack1 = document.createElement('div');
+    crack1.className = 'rune-crack-1';
+    const crack2 = document.createElement('div');
+    crack2.className = 'rune-crack-2';
+    const chip = document.createElement('div');
+    chip.className = 'rune-chip';
+    const aura = document.createElement('div');
+    aura.className = 'rune-aura';
+    const glyph = document.createElement('span');
+    glyph.className = 'rune-glyph';
+    glyph.textContent = entity.icon || defaultIcon('location');
+    wrap.appendChild(stone);
+    wrap.appendChild(crack1);
+    wrap.appendChild(crack2);
+    wrap.appendChild(chip);
+    wrap.appendChild(aura);
+    wrap.appendChild(glyph);
+  } else {
+    wrap.textContent = entity.icon || defaultIcon(entity.type);
+  }
+
+  return wrap;
+}
+
+function defaultIcon(type) {
+  const icons = { location:'ᛝ', player:'⌖', npc:'❊', enemy:'☠' };
+  return icons[type] || '·';
+}
+
+/* ============================================================
+   LIVE UPDATES
+   ============================================================ */
+function startLiveUpdates() {
+  stopLiveUpdates();
+  State.updateInterval = setInterval(performLiveUpdate, UPDATE_MS);
+}
+function stopLiveUpdates() {
+  if (State.updateInterval) clearInterval(State.updateInterval);
+  State.updateInterval = null;
+}
+
+async function performLiveUpdate() {
+  setStatusLoading();
+  try {
+    const data = await fetchWorldData(State.roomId);
+    const newEntities = data.map || [];
+    State.worldTitle = data.title || State.worldTitle;
+    document.getElementById('world-title').textContent = State.worldTitle;
+
+    // Diff and animate
+    diffAndUpdate(newEntities);
+    updateTimestamp();
+    setStatusConnected();
+  } catch (err) {
+    setStatusOffline();
+  }
+}
+
+function diffAndUpdate(newRaw) {
+  // Build a lookup of old entities by name+type
+  const oldByKey = {};
+  State.entities.forEach(e => {
+    const k = `${e.type}::${e.name}`;
+    oldByKey[k] = e;
+  });
+
+  // Process new positions
+  const processedNew = [];
+  const usedPositions = new Set();
+  // Seed with location positions first
+  newRaw.forEach(e => {
+    if (e.type === 'location' && e.x >= 0 && e.x < GRID_SIZE && e.y >= 0 && e.y < GRID_SIZE) {
+      State.locationIndex[e.name] = { x: e.x, y: e.y };
+      usedPositions.add(`${e.x}_${e.y}`);
+    }
+  });
+
+  newRaw.forEach(e => {
+    let { x, y } = e;
+    if (x == null || y == null || x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+      if (e.location && State.locationIndex[e.location]) {
+        const loc = State.locationIndex[e.location];
+        const adj = findAdjacentFree(loc.x, loc.y, usedPositions);
+        x = adj.x; y = adj.y;
+      } else {
+        const free = findFreeCell(usedPositions);
+        x = free.x; y = free.y;
+      }
+    }
+    usedPositions.add(`${x}_${y}`);
+    processedNew.push({ ...e, x, y });
+  });
+
+  // Detect movements and health changes, animate
+  processedNew.forEach(ne => {
+    const k = `${ne.type}::${ne.name}`;
+    const old = oldByKey[k];
+    if (old) {
+      // Movement is still tracked (used for diffing/repositioning below);
+      // the old disappear/moved flash animation has been removed so
+      // markers no longer blink on every update.
+      if (old.health !== ne.health) {
+        // Health changed — brief one-shot cell highlight (not a marker flash)
+        scheduleHealthAnimation(ne.x, ne.y);
+      }
+    }
+    // New entities render directly via renderAllEntities below — no
+    // separate appear-flash animation is triggered.
+  });
+
+  State.entities = processedNew;
+  buildEntityMap();
+
+  // Render all entities in place. Markers are updated (not destroyed and
+  // recreated) by renderCellEntities/renderAllEntities, so existing DOM
+  // elements keep their identity and stay visually stable across updates.
+  renderAllEntities();
+
+  // The count bubble (+N) is normally refreshed as part of
+  // renderCellEntities, but that only runs when a cell's entity
+  // fingerprint changes. To guarantee the count is always correct
+  // "around the time the API is called," explicitly resync every
+  // count bubble on every live-update cycle, independent of diffing.
+  refreshCountBubbles();
+
+  // If sidebar is open for a tile, refresh it
+  if (State.selectedCell && (State.sidebarOpen || State.sidebarPinned)) {
+    populateSidebar(State.selectedCell.x, State.selectedCell.y);
+  }
+
+  // Re-apply search highlights
+  if (State.searchQuery) performSearch(State.searchQuery);
+}
+
+/* Recompute and sync every location's "+N" count bubble against the
+   current entity data, regardless of whether renderCellEntities decided
+   a full re-render was needed. Only touches the .multi-indicator text
+   (creating/removing it as needed) — never destroys or recreates the
+   underlying marker, so this can run every cycle without flicker. */
+function refreshCountBubbles() {
+  Object.entries(State.entityMap).forEach(([key, entities]) => {
+    const [x, y] = key.split('_').map(Number);
+    const stack = document.getElementById(`stack-${x}-${y}`);
+    if (!stack) return;
+
+    const visible = entities.filter(e => State.filters[e.type] !== false);
+    const marker = stack.querySelector('.entity-marker');
+    if (visible.length === 0 || !marker) return;
+
+    const hasLocation = visible.some(e => e.type === 'location');
+    let primaryEntity;
+    if (hasLocation) {
+      primaryEntity = visible.find(e => e.type === 'location');
+    } else {
+      const priority = { enemy: 4, player: 3, npc: 2 };
+      const sorted = [...visible].sort((a, b) => (priority[b.type] || 0) - (priority[a.type] || 0));
+      primaryEntity = sorted[0];
+    }
+    const rest = visible.filter(e => e !== primaryEntity);
+
+    let ind = marker.querySelector('.multi-indicator');
+    if (rest.length > 0) {
+      if (!ind) {
+        ind = document.createElement('div');
+        ind.className = 'multi-indicator';
+        marker.appendChild(ind);
+      }
+      ind.textContent = `+${rest.length}`;
+    } else if (ind) {
+      ind.remove();
+    }
+  });
+}
+
+/* ============================================================
+   The previous "Player Reveal" system, which cycled through each
+   player's icon at a shared location every 500ms by tearing down and
+   rebuilding the marker DOM, has been removed — it was the primary
+   source of marker flashing/blinking. Locations with multiple players
+   now simply show the location marker with a count bubble
+   (see .multi-indicator / renderCellEntities), which stays stable and
+   is updated in place.
+   ============================================================ */
+
+function scheduleHealthAnimation(x, y) {
+  requestAnimationFrame(() => {
+    const cell = getCell(x, y);
+    if (!cell) return;
+    cell.classList.remove('animate-health-change');
+    void cell.offsetWidth;
+    cell.classList.add('animate-health-change');
+  });
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+function handleCellClick(x, y, cellEl) {
+  // Deselect previous
+  document.querySelectorAll('.map-cell.selected').forEach(c => c.classList.remove('selected'));
+  cellEl.classList.add('selected');
+
+  State.selectedCell = { x, y };
+  openSidebar();
+  populateSidebar(x, y);
+}
+
+function openSidebar() {
+  const sb = document.getElementById('sidebar');
+  State.sidebarOpen = true;
+  sb.classList.add('open');
+}
+function closeSidebar() {
+  if (State.sidebarPinned) return;
+  const sb = document.getElementById('sidebar');
+  State.sidebarOpen = false;
+  sb.classList.remove('open');
+  document.querySelectorAll('.map-cell.selected').forEach(c => c.classList.remove('selected'));
+  State.selectedCell = null;
+}
+
+function populateSidebar(x, y) {
+  document.getElementById('sidebar-coords').textContent = `${x}, ${y}`;
+  const body = document.getElementById('sidebar-body');
+  const entities = State.entityMap[`${x}_${y}`] || [];
+
+  if (entities.length === 0) {
+    body.innerHTML = `
+      <div class="sidebar-empty">
+        <div class="sidebar-empty-sigil">·</div>
+        <p>This tile lies empty — no soul nor stone marks this ground.</p>
+        <p style="font-size:10px;margin-top:4px;letter-spacing:0.1em;font-family:var(--font-mono);">Coordinates: ${x}, ${y}</p>
+      </div>`;
+    return;
+  }
+
+  const groups = { location: [], player: [], npc: [], enemy: [] };
+  entities.forEach(e => { if (groups[e.type]) groups[e.type].push(e); });
+
+  const sectionCfg = [
+    { key: 'location', label: 'Location', icon: 'ᛝ' },
+    { key: 'player',   label: 'Adventurers', icon: '⌖' },
+    { key: 'npc',      label: 'Denizens', icon: '❊' },
+    { key: 'enemy',    label: 'Threats', icon: '☠' },
+  ];
+
+  let html = '';
+  sectionCfg.forEach(({ key, label, icon }) => {
+    const group = groups[key];
+    if (group.length === 0) return;
+    html += `<div class="entity-section">
+      <div class="entity-section-title">
+        <span>${icon}</span>${label}<span class="section-count">${group.length}</span>
+      </div>`;
+    group.forEach(e => { html += buildEntityCard(e, key); });
+    html += `</div>`;
+  });
+
+  body.innerHTML = html;
+
+  // Animate in
+  body.querySelectorAll('.entity-card').forEach((card, i) => {
+    card.style.animationDelay = `${i * 60}ms`;
+  });
+}
+
+function buildEntityCard(e, type) {
+  const icon = e.icon || defaultIcon(type);
+  const name = e.name || 'Unknown';
+  const cls  = e.class || '';
+  const loc  = e.location || '';
+
+  let healthHtml = '';
+  if (e.health != null) {
+    const maxHp = 20;
+    const pct   = Math.max(0, Math.min(100, (e.health / maxHp) * 100));
+    const hpClass = pct > 60 ? 'hp-high' : pct > 30 ? 'hp-medium' : 'hp-low';
+    const overflowClass = e.health > maxHp ? ' hp-glint' : '';
+    const isDown = e.health <= 0;
+    healthHtml = `
+      <div class="health-wrap${isDown ? ' hp-critical' : ''}">
+        <div class="health-label"><span>Health</span><span class="hp-val">${e.health}</span></div>
+        <div class="health-bar-bg">
+          <div class="health-bar-fill ${hpClass}${overflowClass}" style="width:${pct}%"></div>
+          ${isDown ? '<div class="hp-flash-light"></div>' : ''}
+        </div>
+      </div>`;
+  }
+
+  let statsHtml = '';
+  const STATS = [['STR','str'],['DEX','dex'],['CON','con'],['INT','int'],['WIS','wis'],['CHA','cha']];
+  const hasStats = STATS.some(([,k]) => e[k] != null);
+  if (hasStats) {
+    statsHtml = `<div class="stat-grid">` +
+      STATS.map(([label, key]) => e[key] != null
+        ? `<div class="stat-cell"><span class="stat-abbr">${label}</span><span class="stat-val">${e[key]}</span></div>`
+        : ''
+      ).join('') +
+    `</div>`;
+  }
+
+  const badgeLabel = { location:'Place', player:'Player', npc:'NPC', enemy:'Enemy' }[type] || type;
+
+  return `
+    <div class="entity-card type-${type}">
+      <div class="card-header">
+        <span class="card-icon">${icon}</span>
+        <span class="card-name" title="${name}">${name}</span>
+        <span class="card-type-badge">${badgeLabel}</span>
+      </div>
+      ${cls ? `<div class="card-class">${cls}</div>` : ''}
+      ${loc ? `<div class="location-name">📍 ${loc}</div>` : ''}
+      ${healthHtml}
+      ${statsHtml}
+    </div>`;
+}
+
+/* ============================================================
+   SEARCH
+   ============================================================ */
+function initSearch() {
+  const input = document.getElementById('search-input');
+  const wrap  = input.closest('.search-wrap');
+
+  /* ADDED: helper that keeps the .expanded class in sync with focus + content.
+     Rule: expand when focused OR when there is text in the box.
+     Collapse only when the input is BOTH empty AND blurred.
+     This prevents a jarring jump mid-type and matches the requirement. */
+  function syncExpanded() {
+    const hasFocus = document.activeElement === input;
+    const hasText  = input.value.length > 0;
+    wrap.classList.toggle('expanded', hasFocus || hasText);
+  }
+
+  input.addEventListener('input', () => {
+    State.searchQuery = input.value.trim().toLowerCase();
+    performSearch(State.searchQuery);
+    syncExpanded(); /* ADDED: re-evaluate expanded state on every keystroke */
+  });
+
+  /* ADDED: focus/blur listeners drive the expand/collapse animation */
+  input.addEventListener('focus', syncExpanded);
+  input.addEventListener('blur',  syncExpanded);
+}
+
+function performSearch(query) {
+  // Clear all highlights
+  document.querySelectorAll('.map-cell.highlighted').forEach(c => c.classList.remove('highlighted'));
+  State.highlightedCells.clear();
+
+  if (!query) return;
+
+  State.entities.forEach(e => {
+    const searchable = [e.name, e.class, e.location, e.type].filter(Boolean).join(' ').toLowerCase();
+    if (searchable.includes(query)) {
+      const cell = getCell(e.x, e.y);
+      if (cell) {
+        cell.classList.add('highlighted');
+        State.highlightedCells.add(`${e.x}_${e.y}`);
+      }
+    }
+  });
+
+  // Jump to first result
+  if (State.highlightedCells.size > 0) {
+    const [first] = [...State.highlightedCells];
+    const [fx, fy] = first.split('_').map(Number);
+    animateCameraTo(fx, fy);
+  }
+}
+
+/* ============================================================
+   FILTERS
+   ============================================================ */
+function initFilters() {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type;
+      State.filters[type] = !State.filters[type];
+      btn.classList.toggle('inactive', !State.filters[type]);
+      btn.setAttribute('aria-pressed', State.filters[type]);
+      renderAllEntities();
+    });
+  });
+}
+
+/* ============================================================
+   CAMERA CONTROLS
+   ============================================================ */
+function initCamera() {
+  const viewport = document.getElementById('map-viewport');
+  const canvas   = document.getElementById('map-canvas');
+
+  // Mouse drag
+  viewport.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('map-cell') || e.target.closest('.map-cell')) return;
+    State.isDragging   = true;
+    State.dragStart    = { x: e.clientX, y: e.clientY };
+    State.cameraStart  = { ...State.camera };
+    canvas.classList.remove('animate');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!State.isDragging) return;
+    const dx = e.clientX - State.dragStart.x;
+    const dy = e.clientY - State.dragStart.y;
+    State.camera.x = Math.round((State.cameraStart.x + dx) * 100) / 100;
+    State.camera.y = Math.round((State.cameraStart.y + dy) * 100) / 100;
+    applyCamera(false);
+  });
+  window.addEventListener('mouseup', () => { State.isDragging = false; });
+
+  // Scroll / pinch zoom
+  viewport.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+    zoomAt(e.clientX, e.clientY, delta);
+  }, { passive: false });
+
+  // Touch
+  viewport.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      State.isDragging  = true;
+      State.dragStart   = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      State.cameraStart = { ...State.camera };
+      State.touchDist   = null;
+    } else if (e.touches.length === 2) {
+      State.touchDist = getTouchDist(e);
+      State.isDragging = false;
+    }
+    canvas.classList.remove('animate');
+  }, { passive: true });
+
+  viewport.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (e.touches.length === 1 && State.isDragging) {
+      const dx = e.touches[0].clientX - State.dragStart.x;
+      const dy = e.touches[0].clientY - State.dragStart.y;
+      State.camera.x = State.cameraStart.x + dx;
+      State.camera.y = State.cameraStart.y + dy;
+      applyCamera(false);
+    } else if (e.touches.length === 2 && State.touchDist != null) {
+      const newDist = getTouchDist(e);
+      const ratio   = newDist / State.touchDist;
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      zoomAt(cx, cy, (ratio - 1) * 0.5);
+      State.touchDist = newDist;
+    }
+  }, { passive: false });
+
+  viewport.addEventListener('touchend', () => {
+    State.isDragging = false;
+    State.touchDist  = null;
+  });
+
+  // Double-click to center
+  viewport.addEventListener('dblclick', e => {
+    const cell = e.target.closest('.map-cell');
+    if (cell) {
+      animateCameraTo(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
+    }
+  });
+
+  // Keyboard
+  window.addEventListener('keydown', handleKeyboard);
+
+  // Buttons
+  document.getElementById('zoom-in-btn').addEventListener('click',  () => zoomBy(0.2));
+  document.getElementById('zoom-out-btn').addEventListener('click', () => zoomBy(-0.2));
+  document.getElementById('reset-cam-btn').addEventListener('click', centerCamera);
+
+  document.getElementById('goto-btn').addEventListener('click', () => {
+    const x = parseInt(document.getElementById('coord-x').value);
+    const y = parseInt(document.getElementById('coord-y').value);
+    if (!isNaN(x) && !isNaN(y)) animateCameraTo(x, y);
+  });
+}
+
+function getTouchDist(e) {
+  const dx = e.touches[0].clientX - e.touches[1].clientX;
+  const dy = e.touches[0].clientY - e.touches[1].clientY;
+  return Math.sqrt(dx*dx + dy*dy);
+}
+
+function handleKeyboard(e) {
+  if (document.activeElement.tagName === 'INPUT') return;
+  const step = 50;
+  const canvas = document.getElementById('map-canvas');
+  canvas.classList.remove('animate');
+  switch (e.key) {
+    case 'ArrowLeft':  State.camera.x = Math.round((State.camera.x + step) * 100) / 100; applyCamera(false); break;
+    case 'ArrowRight': State.camera.x = Math.round((State.camera.x - step) * 100) / 100; applyCamera(false); break;
+    case 'ArrowUp':    State.camera.y = Math.round((State.camera.y + step) * 100) / 100; applyCamera(false); break;
+    case 'ArrowDown':  State.camera.y = Math.round((State.camera.y - step) * 100) / 100; applyCamera(false); break;
+    case '+': case '=': zoomBy(0.15); break;
+    case '-': case '_': zoomBy(-0.15); break;
+    case 'Escape': closeSidebar(); break;
+  }
+}
+
+function zoomAt(clientX, clientY, delta) {
+  const viewport = document.getElementById('map-viewport');
+  const rect = viewport.getBoundingClientRect();
+  const mx = clientX - rect.left;
+  const my = clientY - rect.top;
+
+  const oldScale = State.camera.scale;
+  const newScale = Math.max(0.3, Math.min(3.5, oldScale + delta));
+
+  const ratio = newScale / oldScale;
+  State.camera.x = mx + (State.camera.x - mx) * ratio;
+  State.camera.y = my + (State.camera.y - my) * ratio;
+  State.camera.scale = Math.round(newScale * 1000) / 1000;
+
+  applyCamera(false);
+}
+
+function zoomBy(delta) {
+  const viewport = document.getElementById('map-viewport');
+  const rect = viewport.getBoundingClientRect();
+  zoomAt(rect.width / 2, rect.height / 2, delta);
+}
+
+function applyCamera(animated = false) {
+  const canvas = document.getElementById('map-canvas');
+  if (animated) canvas.classList.add('animate');
+  else canvas.classList.remove('animate');
+  // Round to sub-pixel values to prevent fractional-pixel jitter on mobile
+  const rx = Math.round(State.camera.x * 100) / 100;
+  const ry = Math.round(State.camera.y * 100) / 100;
+  const rs = Math.round(State.camera.scale * 1000) / 1000;
+  canvas.style.transform = `translate3d(${rx}px, ${ry}px, 0) scale(${rs})`;
+}
+
+function centerCamera() {
+  const viewport = document.getElementById('map-viewport');
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  const gridPx = GRID_SIZE * (CELL_SIZE);
+  State.camera.scale = Math.round(Math.min(1, (vw - 40) / gridPx, (vh - 40) / gridPx) * 1000) / 1000;
+  State.camera.x = Math.round((vw - gridPx * State.camera.scale) / 2 * 100) / 100;
+  State.camera.y = Math.round((vh - gridPx * State.camera.scale) / 2 * 100) / 100;
+  applyCamera(true);
+}
+
+function animateCameraTo(x, y) {
+  const viewport = document.getElementById('map-viewport');
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  const targetX = Math.round(((vw / 2) - (x * CELL_SIZE + CELL_SIZE/2) * State.camera.scale) * 100) / 100;
+  const targetY = Math.round(((vh / 2) - (y * CELL_SIZE + CELL_SIZE/2) * State.camera.scale) * 100) / 100;
+  State.camera.x = targetX;
+  State.camera.y = targetY;
+  applyCamera(true);
+}
+
+/* ============================================================
+   TOOLTIP
+   ============================================================ */
+function showCellTooltip(x, y, evt) {
+  const entities = State.entityMap[`${x}_${y}`] || [];
+  if (entities.length === 0) return;
+
+  const tooltip = document.getElementById('cell-tooltip');
+  const visible = entities.filter(e => State.filters[e.type] !== false);
+  if (visible.length === 0) return;
+
+  tooltip.innerHTML = visible.slice(0,5).map(e =>
+    `<div class="tooltip-entry">
+      <span class="tooltip-icon">${e.icon || defaultIcon(e.type)}</span>
+      <span class="tooltip-name">${e.name || ''}</span>
+    </div>`
+  ).join('');
+  if (visible.length > 5) {
+    tooltip.innerHTML += `<div style="font-size:10px;color:var(--ash);margin-top:3px;">+${visible.length-5} more</div>`;
+  }
+
+  const tx = Math.min(evt.clientX + 12, window.innerWidth - 220);
+  const ty = Math.min(evt.clientY + 12, window.innerHeight - 120);
+  tooltip.style.left = tx + 'px';
+  tooltip.style.top  = ty + 'px';
+  tooltip.classList.add('visible');
+  tooltip.setAttribute('aria-hidden', 'false');
+}
+function hideCellTooltip() {
+  const tooltip = document.getElementById('cell-tooltip');
+  tooltip.classList.remove('visible');
+  tooltip.setAttribute('aria-hidden', 'true');
+}
+
+/* ============================================================
+   STATUS INDICATORS
+   ============================================================ */
+function setStatusConnected() {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = 'status-dot';
+  text.textContent = 'Connected';
+}
+function setStatusOffline() {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = 'status-dot offline';
+  text.textContent = 'Offline';
+}
+function setStatusLoading() {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = 'status-dot loading';
+  text.textContent = 'Updating…';
+}
+function updateTimestamp() {
+  const ts = document.getElementById('last-updated');
+  const now = new Date();
+  ts.textContent = `Updated ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+}
+
+/* ============================================================
+   CONSTELLATION ANIMATION (loading screen)
+   ============================================================ */
+let constellationRAF = null;
+const constellationParticles = [];
+
+function startConstellationAnimation() {
+  const canvas = document.getElementById('constellation-canvas');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+
+  // Generate particles
+  constellationParticles.length = 0;
+  for (let i = 0; i < 80; i++) {
+    constellationParticles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random()-0.5) * 0.4,
+      vy: (Math.random()-0.5) * 0.4,
+      r: Math.random() * 1.8 + 0.4,
+      alpha: Math.random() * 0.5 + 0.2,
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Move
+    constellationParticles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = canvas.width;
+      if (p.x > canvas.width) p.x = 0;
+      if (p.y < 0) p.y = canvas.height;
+      if (p.y > canvas.height) p.y = 0;
+    });
+    // Draw edges
+    const D = 120;
+    for (let i = 0; i < constellationParticles.length; i++) {
+      const a = constellationParticles[i];
+      for (let j = i+1; j < constellationParticles.length; j++) {
+        const b = constellationParticles[j];
+        const dx = a.x-b.x, dy = a.y-b.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if (dist < D) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(148,135,103,${(1-dist/D)*0.25})`;
+          ctx.lineWidth = 0.5;
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+    // Draw points
+    constellationParticles.forEach(p => {
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(148,135,103,${p.alpha})`;
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+    });
+    constellationRAF = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function stopConstellationAnimation() {
+  if (constellationRAF) { cancelAnimationFrame(constellationRAF); constellationRAF = null; }
+}
+
+/* ============================================================
+   MISC UI BINDINGS
+   ============================================================ */
+function initMiscUI() {
+  // Error retry
+  document.getElementById('retry-btn').addEventListener('click', () => {
+    const roomId = document.getElementById('error-room-id').value.trim();
+    if (!roomId) return;
+    State.roomId = roomId;
+    showScreen('loading');
+    stopConstellationAnimation();
+    startConstellationAnimation();
+    loadWorld(roomId);
+  });
+
+  // Sidebar close
+  document.getElementById('close-sidebar-btn').addEventListener('click', () => {
+    State.sidebarPinned = false;
+    document.getElementById('sidebar-pin-btn').classList.remove('active');
+    closeSidebar();
+  });
+
+  // Sidebar pin
+  document.getElementById('sidebar-pin-btn').addEventListener('click', () => {
+    State.sidebarPinned = !State.sidebarPinned;
+    document.getElementById('sidebar-pin-btn').classList.toggle('active', State.sidebarPinned);
+    const sb = document.getElementById('sidebar');
+    sb.classList.toggle('pinned', State.sidebarPinned);
+    if (State.sidebarPinned && !State.sidebarOpen) openSidebar();
+  });
+
+  // Back to landing
+  document.getElementById('back-to-landing').addEventListener('click', () => {
+    stopLiveUpdates();
+    stopConstellationAnimation();
+    showScreen('landing');
+  });
+  document.getElementById('back-to-landing').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('back-to-landing').click();
+  });
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function main() {
+  initAtmosphere();
+  initLanding();
+  initMiscUI();
+  initFilters();
+  initSearch();
+  initCamera();
+}
+
+document.addEventListener('DOMContentLoaded', main);
+
+// Register service worker for PWA installability + offline app shell.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+
+</script>
+</body>
+</html>
