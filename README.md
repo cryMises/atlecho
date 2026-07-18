@@ -40,28 +40,6 @@ There is no build step — it's a static site. Deploy the folder as-is to any st
 
 ---
 
-## Getting started
-
-### Run locally
-
-Because the service worker requires a secure context, don't just double-click `index.html`. Serve it instead:
-
-```bash
-# from the project folder
-python3 -m http.server 8000
-# then open http://localhost:8000
-```
-
-Any static file server works (`npx serve`, `live-server`, etc.) — `localhost` is treated as secure, so the PWA features work there too.
-
-### Deploy
-
-1. Upload all files in the structure above to your host's root.
-2. Make sure the host serves over **HTTPS** — required for the service worker to register (localhost is the only exception).
-3. Visit the site; the browser will offer an "Install" / "Add to Home Screen" prompt once the manifest and service worker are detected.
-
----
-
 ## Configuration
 
 Key constants live near the top of the `<script>` block in `index.html`:
@@ -145,4 +123,4 @@ Built with modern, evergreen browsers in mind (Chrome, Edge, Firefox, Safari —
 
 ## License
 
-Add your preferred license here.
+Demo Purpose Only. Contact Me For More Information
